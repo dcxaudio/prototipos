@@ -8,8 +8,9 @@
  * desenho. A tela só lê o estado que o worklet devolve (~48 vezes por segundo).
  *
  * MIDI padrão (depois do MIDI Learn, que tem prioridade):
- *   pitch bend     pitch wheel de 14 bits: mão no disco (Hand) ou velocidade (Speed)
- *   CC 14          fader de scratch (fader 1 do Minilab3; CC 15, 30 e 31 ficam livres)
+ *   pitch bend     pitch wheel de 14 bits: mão no disco (Hand, curso ±30° por padrão,
+ *                  regulável pelo controle "Wheel" do alto da página) ou velocidade (Speed)
+ *   CC 14          fader (x = 0 lado da música, x = 1 lado do scratch no modo Mix) (fader 1 do Minilab3; CC 15, 30 e 31 ficam livres)
  *   CC 28 e 29     encoder relativo: jog; rápido vira empurrão ou backspin
  * O host escuta só a porta "Minilab3 MIDI" (ignora MCU/HUI e ALV, que repetem os
  * faders como pitch bend falso).
@@ -30,9 +31,11 @@
       this.host = host;
       this.id = host.id;
       this.on = false;
-      this.st = { vol: 0.8, torque: 1, rpm: 33, run: false, mode: "hand", curve: "sharp", hamster: false, fader: 1 };
+      this.st = { vol: 0.8, torque: 1, rpm: 33, run: false, mode: "hand", range: 30, mix: "mix", slip: true, src: "music", kit: "scratch-01", slot: 0, curve: "sharp", hamster: false, fader: 0.5 };
       this.tele = { pos: 0, total: 0, v: 0, g: 1, hand: false, seconds: 0, len: 0, at: performance.now(), sr: 48000 };
-      this.name = "DEMO";
+      this.name = "DEMO"; this.musicName = "DEMO";
+      this.kits = {};                 // kit -> array de { slot, name, wav } (um por vez no global DCX.SCRATCH_KIT)
+      this.gestCache = {};            // "kit/slot" -> Float32Array já decodificado
       this.held = false;              // a mão do mouse/toque está no disco
       this.knobs = {};
       this.msgs = 0;                  // mensagens de MIDI entregues ao worklet (para o teste)
@@ -82,6 +85,16 @@
         const f = (e.target.files || [])[0];
         if (f) this.loadFile(f);
       });
+      // curso do pitch wheel: controle da página (fora do painel aprovado), em tempo real
+      this.rangeEl = $("#r45-range"); this.rangeOut = $("#r45-range-v");
+      if (this.rangeEl) this.rangeEl.addEventListener("input", () => this.setRange(+this.rangeEl.value));
+      // disco do scratch (botões do painel): fonte, kit, gesto, modo do fader e Slip
+      this.btn("src", "RJ-45 Scratch Source", () => this.setSource(this.st.src === "music" ? "sample" : "music"));
+      this.btn("kit", "RJ-45 Kit", () => this.setKit(this.st.kit === "scratch-01" ? "scratch-02" : "scratch-01"));
+      this.btn("gest-prev", "RJ-45 Gesture -", () => this.stepGesture(-1));
+      this.btn("gest-next", "RJ-45 Gesture +", () => this.stepGesture(1));
+      this.btn("fader-mode", "RJ-45 Fader Mix/Cut", () => this.setMix(this.st.mix === "mix" ? "cut" : "mix"));
+      this.btn("slip", "RJ-45 Slip", () => this.setSlip(!this.st.slip));
       // MIDI padrão do aparelho
       this.host.midi.addDefaults(d => this.midi(d));
 
@@ -191,6 +204,8 @@
       this.paintAll();
       this.setLcd("DEMO", "0:00.0");
       this.showLatency(ctx);
+      this.post({ k: "src", s: "music" });
+      if (this.st.src === "sample") this.setSource("sample"); else this.setKit(this.st.kit, true);
     }
 
     showLatency(ctx) {
@@ -207,6 +222,9 @@
       this.post({ k: "torque", s: this.torqueSec() });
       this.post({ k: "rpm", v: s.rpm });
       this.post({ k: "mode", m: s.mode });
+      this.post({ k: "range", deg: s.range });
+      this.post({ k: "mix", m: s.mix });
+      this.post({ k: "slip", on: s.slip });
       this.post({ k: "curve", c: s.curve });
       this.post({ k: "hamster", on: s.hamster });
       this.post({ k: "xf", x: s.fader });
@@ -220,6 +238,89 @@
     setRun(r) { this.st.run = r; this.post({ k: "run", on: r }); this.paintRun(); this.flash(r ? "START" : "STOP"); }
     setRpm(v) { this.st.rpm = v; this.post({ k: "rpm", v }); this.paintRpm(); this.dirty(); this.flash(v + " RPM"); }
     setMode(m) { this.st.mode = m; this.post({ k: "mode", m }); this.paintMode(); this.dirty(); this.flash(m === "hand" ? "WHEEL HAND" : "WHEEL SPEED"); }
+    setRange(deg) {
+      deg = clamp(Math.round(deg), 5, 360);
+      this.st.range = deg; this.post({ k: "range", deg }); this.paintRange(); this.dirty(); this.flash("WHEEL ±" + deg);
+    }
+    setMix(m) { this.st.mix = m === "cut" ? "cut" : "mix"; this.post({ k: "mix", m: this.st.mix }); this.paintDisc(); this.dirty(); this.flash(this.st.mix === "mix" ? "FADER MIX" : "FADER CUT"); }
+    setSlip(on) { this.st.slip = !!on; this.post({ k: "slip", on: this.st.slip }); this.paintDisc(); this.dirty(); this.flash(on ? "SLIP ON" : "SLIP OFF"); }
+    /* ---- fonte do scratch e kits ---- */
+
+    /** Injeta o kit.js do kit pedido (os dois definem DCX.SCRATCH_KIT, então um de cada vez) e guarda o array. */
+    loadKit(kit) {
+      if (this.kits[kit]) return Promise.resolve(this.kits[kit]);
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = new URL(`kits/${kit}/kit.js`, document.baseURI).href;
+        s.onload = () => {
+          const arr = (window.DCX && window.DCX.SCRATCH_KIT) || null;
+          if (window.DCX) delete window.DCX.SCRATCH_KIT;     // o próximo kit começa limpo
+          s.remove();
+          if (!arr || !arr.length) return reject(new Error("kit vazio"));
+          this.kits[kit] = arr; resolve(arr);
+        };
+        s.onerror = () => { s.remove(); reject(new Error("kit não encontrado")); };
+        document.head.appendChild(s);
+      });
+    }
+    async decodeGesture(kit, i) {
+      const key = kit + "/" + i;
+      if (this.gestCache[key]) return this.gestCache[key];
+      const g = this.kits[kit][i], ctx = this.host.engine.ensure();
+      const dec = await RJ.decodeAudio(ctx, RJ.dsp.base64ToArrayBuffer(g.wav));
+      return (this.gestCache[key] = dec.raw);
+    }
+    async setKit(kit, quiet) {
+      try {
+        await this.loadKit(kit);
+        this.st.kit = kit; this.st.slot = clamp(this.st.slot, 0, this.kits[kit].length - 1);
+        this.paintDisc();
+        if (this.st.src === "sample") await this.applyGesture();
+        this.dirty();
+      } catch (e) { console.warn("Kit não abriu", e); if (!quiet) this.flash("KIT ERRO"); }
+    }
+    async setGesture(i) {
+      const arr = this.kits[this.st.kit]; if (!arr) return;
+      this.st.slot = ((i % arr.length) + arr.length) % arr.length;
+      this.dirty();
+      if (this.st.src !== "sample") { this.st.src = "sample"; this.post({ k: "src", s: "sample" }); this.paintDisc(); }
+      await this.applyGesture();
+    }
+    stepGesture(d) { return this.setGesture(this.st.slot + d); }
+    async applyGesture() {
+      const arr = this.kits[this.st.kit]; if (!arr) return;
+      const g = arr[this.st.slot], seq = (this.gseq = (this.gseq || 0) + 1);
+      try {
+        const raw = await this.decodeGesture(this.st.kit, this.st.slot);
+        if (seq !== this.gseq) return;                    // chegou outro pedido: vale o último
+        const data = raw.slice();
+        this.post({ k: "sample", data }, [data.buffer]);
+        this.setLcd(g.slot + " " + g.name.toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, 7), "0:00.0");
+      } catch (e) { console.warn("Gesto não abriu", e); this.flash("GESTO ERRO"); }
+    }
+    async setSource(s) {
+      s = s === "sample" ? "sample" : "music";
+      this.st.src = s; this.paintDisc(); this.dirty();
+      if (s === "sample") {
+        this.flash("SCRATCH SAMPLE");
+        if (!this.kits[this.st.kit]) await this.setKit(this.st.kit);
+        await this.applyGesture();
+        this.post({ k: "src", s });
+      } else {
+        this.post({ k: "src", s }); this.setLcd(this.musicName, null); this.flash("SCRATCH MUSIC");
+      }
+    }
+    paintDisc() {
+      this.led("src-mus", this.st.src === "music"); this.led("src-smp", this.st.src === "sample");
+      this.led("kit-1", this.st.kit === "scratch-01"); this.led("kit-2", this.st.kit === "scratch-02");
+      this.led("mix", this.st.mix === "mix"); this.led("cut", this.st.mix === "cut");
+      this.led("slip", this.st.slip && this.st.mix === "mix");
+    }
+    paintRange() {
+      this.paintDisc();
+      if (this.rangeEl) this.rangeEl.value = this.st.range;
+      if (this.rangeOut) this.rangeOut.textContent = "±" + this.st.range + "°";
+    }
     setCurve(c) { this.st.curve = c; this.post({ k: "curve", c }); this.paintSwitches(); this.dirty(); this.flash("CURVE " + c.toUpperCase()); }
     setHamster(on) { this.st.hamster = on; this.post({ k: "hamster", on }); this.paintSwitches(); this.dirty(); this.flash(on ? "HAMSTER ON" : "HAMSTER OFF"); }
     setFader(x) {
@@ -238,8 +339,8 @@
         if (!raw.length) throw new Error("arquivo vazio");
         const data = raw.slice();
         this.post({ k: "load", data }, [data.buffer]);
-        this.name = (f.name.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9 ]/g, "").toUpperCase() || "SOM").slice(0, 10);
-        this.setLcd(this.name, "0:00.0");
+        this.musicName = (f.name.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9 ]/g, "").toUpperCase() || "SOM").slice(0, 10);
+        this.setLcd(this.musicName, "0:00.0");
       } catch (e) {
         console.warn("Não deu para abrir o arquivo", e);
         this.setLcd("ERRO", null);
@@ -275,8 +376,8 @@
     }
     saveNow() {
       if (!this.on) return;
-      const { vol, torque, rpm, mode, curve, hamster, fader } = this.st;
-      try { this.host.store.put(STATE_KEY, JSON.stringify({ vol, torque, rpm, mode, curve, hamster, fader })); } catch (e) { console.warn(e); }
+      const { vol, torque, rpm, mode, range, mix, slip, src, kit, slot, curve, hamster, fader } = this.st;
+      try { this.host.store.put(STATE_KEY, JSON.stringify({ vol, torque, rpm, mode, range, mix, slip, src, kit, slot, curve, hamster, fader })); } catch (e) { console.warn(e); }
     }
 
     setLcd(name, time) {
@@ -308,7 +409,7 @@
     }
     paintAll() {
       this.led("power", this.on);
-      this.paintRun(); this.paintRpm(); this.paintMode(); this.paintSwitches();
+      this.paintRange(); this.paintRun(); this.paintRpm(); this.paintMode(); this.paintSwitches();
       Object.values(this.knobs).forEach(k => k.draw());
       this.el.xf.style.setProperty("--pos", this.st.fader.toFixed(3));
     }

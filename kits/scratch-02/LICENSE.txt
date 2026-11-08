@@ -1,0 +1,37 @@
+DCX Scratch 02 - gestos de scratch para o aparelho de scratch da DCX Audio
+
+Todo o kit esta em dominio publico: Creative Commons CC0 1.0.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Nenhum som novo foi baixado. Cada som e um gesto de scratch (movimento da
+agulha por leitura de velocidade variavel + cortes de fader por gate),
+gerado em codigo por acervo/gerar_scratch02.py a partir das bases CC0 do
+kit scratch-01 (ver acervo/scratch-01/LICENSE.txt):
+  A1 / A2 tones: sintetizados pela DCX Audio (CC0)
+  B1 ahhh: Freesound, jrssandoval, CC0 1.0 (freesound.org/people/jrssandoval/sounds/68135/)
+  B2 fresh: voz sintetizada por formantes pela DCX Audio (CC0)
+  B3 yeah: Freesound, bogenseeberg, CC0 1.0 (freesound.org/people/bogenseeberg/sounds/475444/)
+  B4 hah: Freesound, metrostock99, CC0 1.0 (freesound.org/people/metrostock99/sounds/345078/)
+  B7 sax: VCSL (Versilian Studios), CC0 1.0 (github.com/sgossner/VCSL)
+A voz de Igor nao e usada. Nada de studioscratches.com / Change The Beat.
+
+Sons (arquivo - base - o que foi feito):
+  C1-baby-tom.wav - A1 tone 1 kHz - baby: ida e volta da agulha, 2 ciclos
+  C2-baby-yeah.wav - B3 yeah (Freesound bogenseeberg, CC0) - baby: ida e volta, 2 ciclos
+  C3-baby-sax.wav - B7 stab de sax (VCSL, CC0) - baby: ida e volta, 2 ciclos
+  C4-transformer-tom.wav - A1 tone 1 kHz - transformer: 8 cortes ritmicos de fader (gate)
+  C5-transformer-ahhh.wav - B1 ahhh (Freesound jrssandoval, CC0) - transformer: 6 cortes de fader
+  C6-chirp-tom.wav - A1 tone 1 kHz - chirp: 3 ida-e-volta curtas com fader abrindo so na ida
+  C7-chirp-hah.wav - B4 hah (Freesound metrostock99, CC0) - chirp: 3 ida-e-volta curtas
+  C8-tear-tom.wav - A2 tone grave - tear: avanco em degraus sem fechar o fader
+  D1-tear-yeah.wav - B3 yeah (Freesound bogenseeberg, CC0) - tear: avanco em degraus
+  D2-flare-tom.wav - A1 tone 1 kHz - flare: ida aberta e volta com 3 cliques de fader
+  D3-flare-sax.wav - B7 stab de sax (VCSL, CC0) - flare: ida aberta e volta com 2 cliques
+  D4-scribble-fresh.wav - B2 fresh sintetico (DCX, CC0) - scribble: vibracao rapida da agulha (14 Hz)
+  D5-scribble-tom.wav - A1 tone 1 kHz - scribble: vibracao rapida da agulha (18 Hz)
+  D6-freio-ahhh.wav - B1 ahhh (Freesound jrssandoval, CC0) - freio: velocidade cai a zero (toca-discos parando)
+  D7-dip-ahhh.wav - B1 ahhh (Freesound jrssandoval, CC0) - drag de pitch: desacelera e volta
+  D8-fresh-scrub.wav - B2 fresh sintetico (DCX, CC0) - baby no fresh sintetico, 2 ciclos
+
+Alteracoes: passa-alta 80 Hz, fade de 0,5 ms/6 ms, normalizado a -1 dBFS,
+mono 44.100 Hz 16-bit. Os creditos aos autores sao cortesia; a CC0 nao exige.

@@ -52,7 +52,7 @@ function apply(tt, m) {
 
 /** Roda amostra a amostra e devolve a velocidade, o ganho e a posição de cada uma. */
 function trace(events, ms, opts, setup) {
-  const tt = new Turntable(SR, opts);
+  const tt = new Turntable(SR, Object.assign({ wheelRangeDeg: WHEEL_RANGE, mixMode: "cut" }, opts));
   tt.load(SOUND);
   if (setup) setup(tt);
   events = events.slice().sort((a, b) => a.t - b.t);
@@ -155,9 +155,78 @@ console.log("\nlatência do software (degrau de 20° no pitch wheel)");
   ok(fw < 5, "corte do fader em menos de 5 ms (bloco + rampa de 1 ms)");
 }
 
+/* ---------------------------------------------------------------- micro riscos (curso padrão do wheel) */
+console.log("\nmicro riscos (curso padrão ±30°, riscos de ±10° a 5 Hz)");
+{
+  const RANGE = Turntable.DEFAULTS.wheelRangeDeg, pwR = d => Math.max(0, Math.min(16383, Math.round(8192 + d / RANGE * 8192)));
+  const hand = t => 10 * Math.sin(TWO_PI * 5 * t / 1000) * ramp(t, 120);
+  const rel = t => (t < 1200 ? hand(t) : hand(1200) * Math.max(0, 1 - (t - 1200) / 90));
+  const ev = sample(rel, 0, 1300, pwR, (t, q) => ({ t, k: "wheel", v: q }));
+  const r = trace(ev, 1500, { wheelRangeDeg: RANGE, mixMode: "cut" });
+  const dv = maxAbsDiff(r.v.subarray(0, Math.round(1.18 * SR)), Math.round(0.2 * SR));
+  const t0 = Math.round(0.4 * SR), base = r.pos[t0] / SPD - hand(400);
+  let best = null;
+  for (let tau = -5; tau <= 25; tau += 0.5) {
+    let sum = 0, n = 0;
+    for (let s = t0; s < 1.15 * SR; s += 8) { const e = r.pos[s] / SPD - base - hand(s / SR * 1000 - tau); sum += e * e; n++; }
+    const rms = Math.sqrt(sum / n); if (!best || rms < best.rms) best = { tau, rms };
+  }
+  let lo = 1e9, hi = -1e9; for (let s = t0; s < 1.15 * SR; s++) { const d = r.pos[s] / SPD; lo = Math.min(lo, d); hi = Math.max(hi, d); }
+  console.log(`    salto de velocidade ${dv.toFixed(4)} · atraso ${best.tau.toFixed(1)} ms · erro ${best.rms.toFixed(2)}° RMS · o disco anda ${(hi - lo).toFixed(0)}° de ponta a ponta`);
+  ok(RANGE <= 60, "curso padrão sutil (±" + RANGE + "°)");
+  ok(dv < V_STEP, "micro riscos sem degrau (< " + V_STEP + ")");
+  ok(best.tau < 10, "micro riscos: menos de 10 ms atrás da mão (" + best.tau.toFixed(1) + " ms)");
+  ok(hi - lo < 40, "o disco muda pouco de posição (" + (hi - lo).toFixed(0) + "° de ponta a ponta)");
+}
+
+/* ---------------------------------------------------------------- disco do scratch: música ou sample (kits) */
+console.log("\nfonte do scratch (música | sample) e kits");
+{
+  const mk = f => { const tt = new Turntable(SR, { wheelRangeDeg: 30 }); tt.load(SOUND); tt.setRun(true); tt.v = tt.mv = 1; if (f) f(tt); return tt; };
+  const one = new Float32Array(1), runN = (tt, secs) => { for (let i = 0; i < secs * SR; i++) tt.process(one, 1); };
+  const DC = new Float32Array(1000).fill(0.5);
+  let tt = mk(t => { t.loadSample(DC); t.setSource("sample"); t.setFader(1); });
+  runN(tt, 0.05);
+  ok(Math.abs(tt.snapshot().g - 1) < 1e-9 && tt.gA === 0, "fader no scratch: só o sample soa, a música some");
+  let o = 0; for (let i = 0; i < 2000; i++) { tt.process(one, 1); o = one[0]; }
+  ok(Math.abs(o - 0.5 * tt.o.mixTrim) < 1e-6, "o scratch toca o sample (saída " + o.toFixed(3) + ")");
+  ok(tt.pos >= 0 && tt.pos < DC.length, "o gesto toca em loop: a posição dá a volta em " + DC.length + " amostras (pos " + tt.pos.toFixed(0) + ")");
+  const mpos0 = tt.mpos; runN(tt, 0.1);
+  ok(Math.abs(tt.mpos - ((mpos0 + 0.1 * SR) % tt.len)) < 2, "a música segue por baixo, no tempo dela");
+  tt.setFader(0); runN(tt, 0.05); tt.process(one, 1);
+  ok(tt.gAT === 1 && tt.gT === 0 && Math.abs(one[0]) < 0.8, "fader na música: o sample sai e a música volta");
+  // sem sample carregado, a fonte "sample" cai para a música (não fica mudo nem quebra)
+  tt = mk(t => { t.setSource("sample"); t.setFader(1); }); runN(tt, 0.05); tt.process(one, 1);
+  ok(Number.isFinite(one[0]) && tt.pos < tt.len, "fonte sample sem gesto carregado: usa a música, sem erro");
+  // voltar à música põe o scratch onde a música está
+  tt = mk(t => { t.loadSample(DC); t.setSource("sample"); }); runN(tt, 0.3); tt.setSource("music");
+  ok(Math.abs(tt.pos - tt.mpos) < 1e-6, "de volta à música, o scratch cai onde a música está");
+  // a mão e o jog mexem no sample como mexem na música
+  tt = mk(t => { t.loadSample(DC); t.setSource("sample"); t.setFader(1); t.setRun(false); t.v = t.mv = 0; });
+  const p0 = tt.total; for (let k = 0; k < 10; k++) { tt.jog(1, 1000 + k * 50); runN(tt, 0.05); }
+  ok((tt.total - p0) / SPD > 10, "o jog gira o disco do sample (" + ((tt.total - p0) / SPD).toFixed(0) + "°)");
+}
+console.log("\nkits CC0 (kits/scratch-01 e scratch-02)");
+{
+  const fs = require("fs"), path = require("path"), vm = require("vm");
+  const kits = {};
+  for (const k of ["scratch-01", "scratch-02"]) {   // um de cada vez, como o navegador: os dois definem DCX.SCRATCH_KIT
+    const ctx = vm.createContext({}); ctx.window = ctx;
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "kits", k, "kit.js"), "utf8"), ctx);
+    kits[k] = ctx.DCX.SCRATCH_KIT;
+  }
+  const a = kits["scratch-01"], b = kits["scratch-02"];
+  ok(a.length === 16 && b.length === 16, "cada kit traz 16 sons, 2 bancos de 8 (" + a.length + " e " + b.length + ")");
+  ok(a[0].slot === "A1" && a[15].slot === "B8", "kit 01: A1 a B8 (slots " + a.map(x => x.slot).join(",") + ")");
+  ok(b.map(x => x.slot).join(",") === "C1,C2,C3,C4,C5,C6,C7,C8,D1,D2,D3,D4,D5,D6,D7,D8", "kit 02: gestos C1 a D8");
+  const all = [...a, ...b];
+  ok(all.every(x => x.name && x.wav && Buffer.from(x.wav, "base64").slice(0, 4).toString() === "RIFF"), "todos os sons são WAV (RIFF) com nome");
+  ok(a !== b && a[0].wav !== b[0].wav, "os dois arrays ficam separados depois de lidos um por vez");
+}
+
 /* ---------------------------------------------------------------- motor, Stop, jog, prioridade */
 const run = (tt, secs) => { const one = new Float32Array(1); for (let s = 0; s < secs * SR; s++) tt.process(one, 1); };
-const fresh = f => { const tt = new Turntable(SR); tt.load(SOUND); if (f) f(tt); return tt; };
+const fresh = f => { const tt = new Turntable(SR, { wheelRangeDeg: WHEEL_RANGE, mixMode: "cut" }); tt.load(SOUND); if (f) f(tt); return tt; };
 
 console.log("\nmotor");
 {
@@ -210,6 +279,50 @@ console.log("\nfader: curvas e Hamster");
   ok(gain("medium", 0.04) === 0 && gain("medium", 0.5) === 1 && gain("medium", 0.15) > 0 && gain("medium", 0.15) < 1, "Medium: sobe em 25% do curso");
   ok(Math.abs(gain("smooth", 0.5) - 0.5) < 1e-9, "Smooth: linear");
   ok(gain("sharp", 1, true) === 0 && gain("sharp", 0, true) === 1, "Hamster inverte o lado");
+}
+
+/* ---------------------------------------------------------------- Mix: música de um lado, scratch do outro */
+console.log("\nfader Mix (música | scratch) e Slip");
+{
+  const mk = (o, f) => { const tt = new Turntable(SR, Object.assign({ wheelRangeDeg: 30 }, o)); tt.load(SOUND); tt.setRun(true); tt.v = tt.mv = 1; if (f) f(tt); return tt; };
+  const gains = (tt, x, c, h) => { tt.setCurve(c || "sharp"); tt.setHamster(!!h); tt.setFader(x); return [tt.gAT, tt.gT]; };
+  const t = mk();
+  let g = gains(t, 0); ok(g[0] === 1 && g[1] === 0, "fader no lado da música: só a música");
+  g = gains(t, 1); ok(g[0] === 0 && g[1] === 1, "fader no lado do scratch: só o scratch");
+  g = gains(t, 0.5); ok(g[0] === 1 && g[1] === 1, "no meio: os dois (a música segue com o scratch por cima)");
+  g = gains(t, 0.03); ok(g[0] === 1 && g[1] === 0, "Sharp: o scratch entra só depois do limiar de 4%");
+  g = gains(t, 0.05); ok(g[1] === 1, "Sharp: cruzou o limiar, o scratch abriu");
+  g = gains(t, 0.5, "medium"); ok(Math.abs(g[0] - g[1]) < 1e-9 && Math.abs(g[0] ** 2 + g[1] ** 2 - 1) < 1e-9, "Medium: potência constante, 50/50 no meio");
+  g = gains(t, 0.25, "smooth"); ok(Math.abs(g[0] - 0.75) < 1e-9 && Math.abs(g[1] - 0.25) < 1e-9, "Smooth: linear");
+  g = gains(t, 0, "sharp", true); ok(g[0] === 0 && g[1] === 1, "Hamster inverte os lados");
+
+  // a música não sente a mão: com scratch pesado, a posição dela é a do motor
+  const hand = t2 => 25 * Math.sin(TWO_PI * 3 * t2 / 1000) * ramp(t2, 150);
+  const wev = sample(t2 => hand(t2), 0, 1500, d => Math.round(8192 + d / 30 * 8192), (tt2, q) => ({ t: tt2, k: "wheel", v: q }));
+  const r = trace(wev, 1500, { wheelRangeDeg: 30, mixMode: "mix" }, tt => { tt.setRun(true); tt.v = tt.mv = 1; tt.setSlip(false); });
+  const ideal = 1.5 * SR;   // taxa 1 durante 1,5 s
+  ok(Math.abs(r.tt.mpos - (ideal % r.tt.len)) < 2, "a música anda como se ninguém tocasse (diferença " + Math.abs(r.tt.mpos - (ideal % r.tt.len)).toFixed(2) + " amostras)");
+  // Slip: largou o disco, o scratch volta à posição da música; sem Slip, fica onde parou
+  const slipOf = on => {
+    const ev2 = sample(t2 => (t2 < 700 ? 25 * Math.sin(TWO_PI * 3 * t2 / 1000) * ramp(t2, 150) : 0), 0, 800, d => Math.round(8192 + d / 30 * 8192), (tt2, q) => ({ t: tt2, k: "wheel", v: q }));
+    const rr = trace(ev2, 2200, { wheelRangeDeg: 30, mixMode: "mix" }, tt => { tt.setRun(true); tt.v = tt.mv = 1; tt.setSlip(on); tt.setTorque(0.7); });
+    let dd = rr.tt.mpos - rr.tt.pos; dd -= rr.tt.len * Math.round(dd / rr.tt.len);
+    return { ms: Math.abs(dd) / SR * 1000, rr };
+  };
+  const on = slipOf(true), off = slipOf(false);
+  ok(on.ms < 2, "Slip ligado: depois de largar, o scratch volta à música (diferença " + on.ms.toFixed(2) + " ms)");
+  ok(off.ms > 10, "Slip desligado: o scratch fica onde parou (diferença " + off.ms.toFixed(0) + " ms)");
+  // sem degrau na volta do Slip e no cruzamento do fader
+  const dvS = maxAbsDiff(on.rr.v, Math.round(0.9 * SR));
+  ok(dvS < V_STEP, "a volta do Slip é suave (salto de velocidade " + dvS.toFixed(4) + ")");
+  const fev = faderEv(t2 => (Math.floor(t2 / 60) % 2 ? 1 : 0), 0, 800);
+  const rf = trace(fev, 900, { mixMode: "mix" }, tt => { tt.setRun(true); tt.v = tt.mv = 1; });
+  ok(maxAbsDiff(rf.g, 1) <= G_STEP && rf.g.length > 0, "o fader entre música e scratch tem rampa de 1 ms");
+  let pk = 0; for (const s of rf.y) pk = Math.max(pk, Math.abs(s));
+  ok(Number.isFinite(pk) && pk <= 1.25, "os dois lados somados ficam dentro da folga (pico " + pk.toFixed(2) + ", o limitador do host cuida do resto)");
+  // o Cut clássico continua igual
+  const c = new Turntable(SR, { mixMode: "cut" }); c.setFader(0);
+  ok(c.gT === 0 && c.gAT === 0, "Cut: fader no zero corta tudo, sem música");
 }
 
 console.log("\n" + (fails ? fails + " falha(s)" : "tudo certo"));

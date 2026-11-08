@@ -8,6 +8,9 @@
  *   { k: "hand", on, a: graus, t: ms }     mouse ou toque
  *   { k: "jog", s: passo, t: ms }          encoder relativo
  *   { k: "xf", x: 0..1 }  { k: "curve", c } { k: "hamster", on }
+ *   { k: "sample", data: Float32Array } { k: "src", s: "music"|"sample" }   disco do scratch
+ *   { k: "mix", m: "mix"|"cut" } { k: "slip", on }
+ *   { k: "range", deg }                  curso do pitch wheel em graus (±)
  *   { k: "run", on } { k: "rpm", v } { k: "torque", s } { k: "mode", m } { k: "cue" }
  */
 class RJ45Processor extends AudioWorkletProcessor {
@@ -28,6 +31,11 @@ class RJ45Processor extends AudioWorkletProcessor {
         case "run": tt.setRun(m.on); break;
         case "rpm": tt.setRpm(m.v); break;
         case "torque": tt.setTorque(m.s); break;
+        case "sample": tt.loadSample(m.data); break;
+        case "src": tt.setSource(m.s); break;
+        case "mix": tt.setMix(m.m); break;
+        case "slip": tt.setSlip(m.on); break;
+        case "range": tt.setWheelRange(m.deg); break;
         case "mode": tt.setMode(m.m); break;
         case "cue": tt.cue(); break;
       }

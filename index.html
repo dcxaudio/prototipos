@@ -22,6 +22,7 @@
   <main class="solo">
     <div class="solo-top">
       <h1 class="solo-title">RJ-45 &middot; DCX Audio</h1>
+      <label class="r45-range" title="Curso do pitch wheel no modo Hand, em graus do disco">Wheel Hand <input type="range" id="r45-range" min="5" max="360" step="1" value="30"> <b id="r45-range-v">±30°</b></label>
       <div id="learnbar"></div>
     </div>
 
@@ -76,6 +77,18 @@
             <button class="r9-btn" data-ctrl="wheel-mode" data-pos="hand" aria-label="Wheel mode: Hand / Speed"></button><span class="r9-cap">Wheel</span></div>
           <div class="r45-knob"><div class="knob r9-knob-s" data-ctrl="torque" role="slider" tabindex="0" aria-label="Torque" style="--a:-20deg"><i></i></div><span class="r9-cap">Torque</span></div>
           <div class="r45-knob"><div class="knob r9-knob-s" data-ctrl="volume" role="slider" tabindex="0" aria-label="Volume" style="--a:50deg"><i></i></div><span class="r9-cap">Volume</span></div>
+        </div>
+
+        <!-- disco do scratch: fonte, kit, gesto, modo do fader e Slip (novos, aprovados por Igor em 08/11/2026) -->
+        <div class="r42-group r45-disc"><span class="r42-gt">Scratch Disc</span>
+          <div class="r45-dgrid">
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="src-mus"></i>Mus</span><span class="r42-lr"><i class="led r9-led" data-led="src-smp"></i>Smp</span></div><button class="r9-btn" data-ctrl="src" aria-label="Fonte do scratch: música ou sample"></button><span class="r9-cap">Source</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="kit-1"></i>01</span><span class="r42-lr"><i class="led r9-led" data-led="kit-2"></i>02</span></div><button class="r9-btn" data-ctrl="kit" aria-label="Kit de samples"></button><span class="r9-cap">Kit</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="mix"></i>Mix</span><span class="r42-lr"><i class="led r9-led" data-led="cut"></i>Cut</span></div><button class="r9-btn" data-ctrl="fader-mode" aria-label="Fader: mix ou cut"></button><span class="r9-cap">Mode</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr r42-dim">&nbsp;</span></div><button class="r9-btn" data-ctrl="gest-prev" aria-label="Gesto anterior"></button><span class="r9-cap">Gest &minus;</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr r42-dim">&nbsp;</span></div><button class="r9-btn" data-ctrl="gest-next" aria-label="Próximo gesto"></button><span class="r9-cap">Gest +</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="slip"></i>Slip</span></div><button class="r9-btn" data-ctrl="slip" aria-label="Slip"></button><span class="r9-cap">Slip</span></div>
+          </div>
         </div>
       </div>
     </div>

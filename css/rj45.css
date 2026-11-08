@@ -172,6 +172,9 @@
 .r45 .r42-lr.off { opacity: .35; }
 .r45 .xf:focus-visible, .r45 .platter:focus-visible { outline: 2px solid var(--rule); outline-offset: 3px; }
 .platter.drop { box-shadow: inset 0 2px 4px #000, 0 0 14px 2px rgba(75, 138, 208, .7); }
+.r45-range { display: flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--page-ink); }
+.r45-range input { width: 160px; accent-color: var(--rule); }
+.r45-range b { font-weight: 600; min-width: 4.2em; color: var(--ink); }
 .r45-lat { font-variant-numeric: tabular-nums; }
 
 /* telas estreitas: o aparelho inteiro diminui (zoom), sem mudar a disposição */
@@ -179,3 +182,10 @@
 @media (max-width: 600px) { :root { --scale: .8; } }
 @media (max-width: 520px) { :root { --scale: .7; } }
 @media (max-width: 440px) { :root { --scale: .6; } }
+
+/* disco do scratch: fonte, kit, gesto, modo do fader e Slip (igual ao mockup) */
+.r45-disc { display: block; padding: 14px 6px 8px; }
+.r45-dgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 2px; }
+.r45-dgrid .r45-dual { gap: 5px; }
+.r45-dgrid .r45-leds { gap: 5px; min-height: 12px; }
+.r45-dgrid .r42-lr { gap: 3px; font-size: 8.5px; }

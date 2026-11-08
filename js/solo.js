@@ -13,7 +13,7 @@
     host.add("rj45", dev, { label: "RJ-45" });
     const root = document.getElementById("r45");
     dev.build(root);
-    new RJ.LearnBar(host, { root, bar: document.getElementById("learnbar") });
+    new RJ.LearnBar(host, { root: document.querySelector("main.solo"), bar: document.getElementById("learnbar") });   // o painel e os controles do alto da página
 
     // tela de ligar: o navegador só libera o som depois de um toque
     const power = document.getElementById("power");

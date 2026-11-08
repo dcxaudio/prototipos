@@ -30,7 +30,7 @@
     leadMs: 3,             // extrapolação à frente da mão, em ms
     rampMs: 1,             // rampa do fader
     jogSmoothMs: 12,       // suavização do jog (encoder)
-    wheelRangeDeg: 360,    // curso total do pitch wheel em graus do disco (±)
+    wheelRangeDeg: 30,     // curso total do pitch wheel em graus do disco (±): micro riscos (regulável: setWheelRange)
     wheelIn: 0.012,        // fração do curso para "pôr a mão" (≈ 98 de 8192)
     wheelOut: 0.006,       // fração para "tirar a mão" ...
     wheelDwellMs: 40,      // ... depois de ficar tanto tempo parado no centro (a mola chegou)
@@ -41,6 +41,9 @@
     jogFast: 60,           // passos/s a partir dos quais vira impulso
     impulse: 0.1,          // taxa somada por passo em impulso
     cutIn: 0.04,           // fração do curso em que o fader abre (Sharp e Medium)
+    mixMode: "mix",        // "mix": o fader mistura a música (como ia estar) com o scratch; "cut": só o scratch, com corte
+    slipMs: 40,            // modo mix com Slip: tempo para o scratch voltar à posição da música depois de largar o disco
+    mixTrim: 0.75,         // folga quando música e scratch soam juntos
     naive: false,          // só para o teste: sem mola e sem rampa (o jeito errado)
   };
 
@@ -51,6 +54,9 @@
       this.data = null; this.len = 0;
       this.pos = 0; this.total = 0;   // total: posição sem dar a volta no loop (para o giro)
       this.v = 0;
+      this.dataB = null; this.srcSample = false;   // material do disco do scratch: a música ou um sample
+      this.mpos = 0; this.mv = 0;     // a música: o disco como estaria se ninguém mexesse
+      this.slip = true;
       this.t = 0;                     // relógio do worklet, em amostras
       this.run = false; this.rpm = 33;
       this.torque = this.o.torqueSec;
@@ -61,31 +67,51 @@
       this.jogT = 0; this.jogRate = 0; this.jogMs = -1e9;
       // fader
       this.fx = 1; this.curve = "sharp"; this.hamster = false;
-      this.gT = 1; this.g = 1;
+      this.gT = 1; this.g = 1;         // ganho do scratch (lado B)
+      this.gAT = 0; this.gA = 0;       // ganho da música (lado A)
       this.updateGain();
     }
 
-    load(data) { this.data = data; this.len = data ? data.length : 0; this.pos = 0; this.total = 0; }
+    load(data) { this.data = data; this.len = data ? data.length : 0; this.pos = 0; this.total = 0; this.mpos = 0; this.mv = 0; }
     setRun(r) { this.run = !!r; }
     setRpm(r) { this.rpm = r === 45 ? 45 : 33; }
     setTorque(sec) { this.torque = clamp(sec, 0.05, 2); }
     setMode(m) { this.mode = m === "speed" ? "speed" : "hand"; this.speedOn = false; this.speedN = 0; }
+    setWheelRange(deg) { this.o.wheelRangeDeg = clamp(+deg || 30, 5, 720); }
     setCurve(c) { this.curve = c; this.updateGain(); }
     setHamster(b) { this.hamster = !!b; this.updateGain(); }
-    cue() { this.pos = 0; this.total = 0; }
+    /** Sample do disco do scratch (um gesto de kit); só soa com a fonte em "sample". */
+    loadSample(data) { this.dataB = data; if (this.srcSample) this.pos = 0; }
+    setSource(s) {
+      const smp = s === "sample"; if (smp === this.srcSample) return;
+      this.srcSample = smp;
+      this.pos = smp ? 0 : this.mpos;            // de volta à música, o disco do scratch cai onde a música está
+    }
+    cue() { this.pos = 0; this.total = 0; this.mpos = 0; }
+    setMix(m) { this.o.mixMode = m === "cut" ? "cut" : "mix"; this.updateGain(); }
+    setSlip(b) { this.slip = !!b; }
     get rate() { return this.rpm === 45 ? 45 / (100 / 3) : 1; }
     get handOn() { return this.h.on || this.wTouch; }
 
     /* ---------------------------------------------------------------- fader */
     setFader(x) { this.fx = clamp(x, 0, 1); this.updateGain(); }
+    /**
+     * x = 0 é o lado da música, x = 1 o lado do scratch (Hamster inverte). Em "mix" cada lado
+     * entra por limiar (cruzou = abriu) e no meio os dois soam; em "cut" só existe o scratch e
+     * x = 0 corta o som, como o fader clássico.
+     */
     updateGain() {
       const x = this.hamster ? 1 - this.fx : this.fx, c = this.o.cutIn;
-      let g;
-      if (this.curve === "sharp") g = x >= c ? 1 : 0;                       // cruzou = abriu
-      else if (this.curve === "medium") { const s = clamp((x - c) / 0.25, 0, 1); g = s * s * (3 - 2 * s); }
-      else g = x;                                                           // smooth: linear no curso todo
-      this.gT = g;
-      if (this.o.naive) this.g = g;
+      let gB, gA = 0;
+      if (this.o.mixMode === "cut") {
+        if (this.curve === "sharp") gB = x >= c ? 1 : 0;                       // cruzou = abriu
+        else if (this.curve === "medium") { const s = clamp((x - c) / 0.25, 0, 1); gB = s * s * (3 - 2 * s); }
+        else gB = x;                                                           // smooth: linear no curso todo
+      } else if (this.curve === "sharp") { gB = x >= c ? 1 : 0; gA = 1 - x >= c ? 1 : 0; }
+      else if (this.curve === "medium") { const u = clamp((x - c) / (1 - 2 * c), 0, 1); gB = Math.sin(u * Math.PI / 2); gA = Math.cos(u * Math.PI / 2); }   // potência constante
+      else { gB = x; gA = 1 - x; }
+      this.gT = gB; this.gAT = gA;
+      if (this.o.naive) { this.g = gB; this.gA = gA; }
     }
 
     /* ---------------------------------------------------------------- mão */
@@ -148,7 +174,8 @@
       if (!this.wTouch) {
         if (Math.abs(n) < o.wheelIn) return;
         this.wTouch = true;
-        this.handBegin(a, ms);
+        this.handBegin(0, ms - 10);          // a mão sai do centro: o primeiro trecho também conta
+        this.handMove(a, ms);
       } else this.handMove(a, ms);       // passar pelo centro no meio do scratch não solta o disco
     }
 
@@ -167,11 +194,13 @@
     process(out, n) {
       const sr = this.sr, o = this.o, dt = 1 / sr, d = this.data, L = this.len, spd = sr / RATE_DEG;
       const w = o.omega, w2 = w * w, h = this.h;
+      const dB = this.srcSample && this.dataB ? this.dataB : d, LB = dB === d ? L : dB.length, same = dB === d;
       const slew = o.naive ? 2 : 1 / (o.rampMs * 1e-3 * sr);
       const kBack = 1 - Math.exp(-dt / 0.015);
       const kT = 1 - Math.exp(-dt / (this.torque / 3));    // 95% do caminho em "torque" segundos
       const kSp = 1 - Math.exp(-dt / 0.008), kJ = 1 - Math.exp(-dt / (o.jogSmoothMs * 1e-3));
       const brake = RATE_DEG / (2 * o.brakeDeg) * dt;      // taxa por amostra (a = v0^2 / 2D)
+      const kSlip = 1 - Math.exp(-dt / (o.slipMs * 1e-3)), mixOn = o.mixMode === "mix", trim = mixOn ? o.mixTrim : 1;
       for (let i = 0; i < n; i++) {
         let dpos;                                          // amostras andadas neste passo
         if (this.wTouch && Math.abs(this.wN) < o.wheelOut && (this.t - h.arr) > o.wheelDwellMs * 1e-3 * sr) { this.wTouch = false; this.handEnd(); }
@@ -187,36 +216,56 @@
           }
         } else {
           const base = this.run ? this.rate : 0;
-          if (this.speedOn) this.v += (base + this.speedN * o.speedGain - this.v) * kSp;
+          if (mixOn && this.slip && LB && !this.speedOn && this.jogT === 0) this.v += (this.mv - this.v) * kSlip;   // Slip: volta à velocidade da música
+          else if (this.speedOn) this.v += (base + this.speedN * o.speedGain - this.v) * kSp;
           else if (base === 0) {
             if (this.v > brake) this.v -= brake; else if (this.v < -brake) this.v += brake; else this.v = 0;
           } else this.v += (base - this.v) * kT;
           dpos = this.v;
         }
         if (this.jogT) { const j = this.jogT * kJ; this.jogT -= j; dpos += j * spd; if (Math.abs(this.jogT) < 1e-6) this.jogT = 0; }
+        // a música segue sozinha, no tempo do motor, qualquer coisa que a mão faça
+        const mb = this.run ? this.rate : 0;
+        if (mb === 0) { if (this.mv > brake) this.mv -= brake; else if (this.mv < -brake) this.mv += brake; else this.mv = 0; }
+        else this.mv += (mb - this.mv) * kT;
+        this.mpos += this.mv;
+        if (L && (this.mpos >= L || this.mpos < 0)) this.mpos -= L * Math.floor(this.mpos / L);
+        // Slip: largou o disco, o scratch volta para onde a música está
+        if (same && mixOn && this.slip && L && !h.on && !this.speedOn && this.jogT === 0) {
+          let dd = this.mpos - this.pos; dd -= L * Math.round(dd / L); dpos += dd * kSlip;
+        }
         this.pos += dpos; this.total += dpos;
-        if (this.pos >= L || this.pos < 0) this.pos -= L * Math.floor(this.pos / L);
+        if (LB && (this.pos >= LB || this.pos < 0)) this.pos -= LB * Math.floor(this.pos / LB);
         this.t++;
 
         // fader: rampa linear de 1 ms
         if (this.g < this.gT) { this.g += slew; if (this.g > this.gT) this.g = this.gT; }
         else if (this.g > this.gT) { this.g -= slew; if (this.g < this.gT) this.g = this.gT; }
 
+        if (this.gA < this.gAT) { this.gA += slew; if (this.gA > this.gAT) this.gA = this.gAT; }
+        else if (this.gA > this.gAT) { this.gA -= slew; if (this.gA < this.gAT) this.gA = this.gAT; }
+
         if (!d || !L) { out[i] = 0; continue; }
-        // interpolação cúbica (Catmull-Rom) de 4 pontos
-        let i1 = Math.floor(this.pos); const f = this.pos - i1;
-        if (i1 >= L) i1 = 0;
-        const i0 = i1 === 0 ? L - 1 : i1 - 1, i2 = i1 + 1 >= L ? i1 + 1 - L : i1 + 1, i3 = i2 + 1 >= L ? i2 + 1 - L : i2 + 1;
-        const y0 = d[i0], y1 = d[i1], y2 = d[i2], y3 = d[i3];
-        const c1 = 0.5 * (y2 - y0), c2 = y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3, c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
-        out[i] = (((c3 * f + c2) * f + c1) * f + y1) * this.g;
+        if (!LB) { out[i] = 0; continue; }
+        out[i] = (this.g > 0 ? this.read(dB, LB, this.pos) * this.g : 0) + (this.gA > 0 ? this.read(d, L, this.mpos) * this.gA : 0);
+        if (mixOn) out[i] *= trim;
       }
+    }
+
+    /** Interpolação cúbica (Catmull-Rom) de 4 pontos, com o loop. */
+    read(d, L, pos) {
+      let i1 = Math.floor(pos); const f = pos - i1;
+      if (i1 >= L) i1 = 0;
+      const i0 = i1 === 0 ? L - 1 : i1 - 1, i2 = i1 + 1 >= L ? i1 + 1 - L : i1 + 1, i3 = i2 + 1 >= L ? i2 + 1 - L : i2 + 1;
+      const y0 = d[i0], y1 = d[i1], y2 = d[i2], y3 = d[i3];
+      const c1 = 0.5 * (y2 - y0), c2 = y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3, c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+      return ((c3 * f + c2) * f + c1) * f + y1;
     }
 
     /** Estado para a interface (e para o teste). */
     snapshot() {
-      return { pos: this.pos, total: this.total, v: this.handOn ? this.h.u / RATE_DEG : this.v, g: this.g, hand: this.handOn,
-        seconds: this.len ? this.pos / this.sr : 0, len: this.len };
+      return { pos: this.pos, total: this.total, v: this.handOn ? this.h.u / RATE_DEG : this.v, g: this.g, gA: this.gA, mseconds: this.len ? this.mpos / this.sr : 0, hand: this.handOn,
+        seconds: this.len ? this.pos / this.sr : 0, len: this.len, sample: this.srcSample };
     }
   }
 
