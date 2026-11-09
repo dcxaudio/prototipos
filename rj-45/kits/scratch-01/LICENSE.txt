@@ -1,0 +1,38 @@
+DCX Scratch 01 - sons para o aparelho de scratch da DCX Audio
+
+Todo o kit esta em dominio publico: Creative Commons CC0 1.0.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Banco A (A1-A8): sintetizados do zero pela DCX Audio, com o script
+acervo/gerar_scratch.py. CC0 1.0.
+  A1 scratch tone 1 kHz, A2 scratch tone grave, A3 stab de synth,
+  A4 stab de metais sintetico, A5 tssh, A6 kick seco, A7 snare seca,
+  A8 chiado de vinil (loop).
+
+Banco B, B1, B3, B4 e B5: vozes do Freesound, todas marcadas CC0 1.0
+(conferidas arquivo por arquivo em 07/11/2026). Baixadas da preview HQ
+(MP3 128 kbps) e convertidas para WAV.
+  B1 ahhh  - "ahh .wav", de jrssandoval
+             https://freesound.org/people/jrssandoval/sounds/68135/
+  B3 yeah  - "~Yeah!", de bogenseeberg
+             https://freesound.org/people/bogenseeberg/sounds/475444/
+  B4 hah   - "HAH SHARP 1.WAV", de metrostock99
+             https://freesound.org/people/metrostock99/sounds/345078/
+  B5 huh   - "Huh? - Vocal", de davdud101
+             https://freesound.org/people/davdud101/sounds/150505/
+
+Banco B, B2 e B6: vozes sintetizadas por formantes pela DCX Audio
+(acervo/gerar_scratch.py): B2 "fresh" e B6 "D-C-X". CC0 1.0.
+
+Banco B, B7-B8: sax tenor staccato da VCSL (Versilian Community Sample
+Library), de Versilian Studios - CC0 1.0.
+https://github.com/sgossner/VCSL
+  B7 stab de sax: BrettTenor_Staccato_Main_C4_vl2_rr3.wav
+  B8 naipe de sax (tres notas somadas): BrettTenor_Staccato_Main_C3_vl2_rr4,
+     _E3_vl2_rr3 e _A#3_vl2_rr4.
+  Pasta: Aerophones/Reed Aerophones/Tenor Saxophone/Staccato
+
+Alteracoes da DCX Audio: convertidos para mono e 44.100 Hz, silencio
+inicial removido, passa-alta (60 Hz no sax, 80 Hz nas vozes), cortados
+(0,35 a 1 s) com fade de 5 ms e normalizados a -1 dBFS. Os creditos a
+VCSL e aos autores do Freesound sao cortesia; a CC0 nao exige.

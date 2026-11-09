@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RJ-45 Scratch Unit</title>
+  <meta name="description" content="RJ-45: toca-discos de scratch no navegador, com um disco de 7&quot; que segue a mão e um fader de scratch. Projeto open source da DCX Audio.">
+  <meta name="theme-color" content="#1c1c1c">
+  <link rel="stylesheet" href="vendor/dcx-core/css/base.css">
+  <link rel="stylesheet" href="vendor/dcx-core/css/solo.css">
+  <link rel="stylesheet" href="css/rj45.css">
+</head>
+<body>
+  <div class="power" id="power">
+    <button class="power-btn" id="power-btn" type="button">
+      <span class="power-ring"></span>
+      <span class="power-label">LIGAR</span>
+    </button>
+    <p class="power-hint">RJ-45 &middot; DCX Audio<br>Toque para ligar o som</p>
+  </div>
+
+  <main class="solo">
+    <div class="solo-top">
+      <h1 class="solo-title">RJ-45 &middot; DCX Audio</h1>
+      <label class="r45-range" title="Curso do pitch wheel no modo Hand, em graus do disco">Wheel Hand <input type="range" id="r45-range" min="5" max="360" step="1" value="30"> <b id="r45-range-v">±30°</b></label>
+      <div id="learnbar"></div>
+    </div>
+
+    <div class="r45-scroll">
+    <section class="r45" id="r45" aria-label="RJ-45 Scratch">
+    <i class="r45-hole" style="left:12px;top:10px"></i><i class="r45-hole" style="right:12px;top:10px"></i>
+    <i class="r45-hole" style="left:12px;bottom:10px"></i><i class="r45-hole" style="right:12px;bottom:10px"></i>
+
+    <!-- marca, energia e visor -->
+    <div class="r45-top">
+      <div class="r9-brand"><span class="r9-maker">DCX</span><span class="r9-sub">Scratch Unit</span></div>
+      <span class="r9-model" style="margin-bottom:-2px">RJ-45</span>
+      <span class="r45-sp"></span>
+      <span class="r45-pwr r42-lr"><i class="led r9-led on" data-led="power"></i>Power</span>
+      <div class="lcd-bezel r45-lcd-bezel"><div class="lcd r45-lcd" data-lcd><span id="lcd-name">DEMO</span><span id="lcd-time">0:00.0</span></div></div>
+    </div>
+
+    <div class="r45-main">
+      <!-- disco -->
+      <div class="r45-deck">
+        <div class="platter" data-ctrl="platter" role="slider" tabindex="0" aria-label="Disco: arraste para fazer scratch">
+          <div class="platter-rot" style="--turn:20deg">
+            <div class="p-edge"></div>
+            <div class="p-vinyl"></div>
+            <div class="p-mark"></div>
+            <div class="p-label"><b>DCX</b><span>RJ-45 · 7"</span></div>
+          </div>
+          <div class="p-sheen"></div>
+          <div class="p-spindle"></div>
+        </div>
+        <div class="r45-deckcap">
+          <span class="r42-lr"><i class="led r9-led" data-led="touch"></i>Touch</span>
+          <span class="r9-cap r42-dim">Platter · arraste para scratch</span>
+        </div>
+      </div>
+
+      <!-- alto-falante e controles -->
+      <div class="r45-side">
+        <div class="r45-grille" aria-hidden="true"></div>
+
+        <div class="r45-keys">
+          <div class="r42-bk"><span class="r42-t">Start</span><i class="led r9-led" data-led="run" style="visibility:hidden"></i><button class="r9-btn red" data-ctrl="start" aria-label="Start / Stop"></button><span class="r9-cap r42-dim">Stop</span></div>
+          <div class="r42-bk"><span class="r42-t">Cue</span><i class="led r9-led" style="visibility:hidden"></i><button class="r9-btn" data-ctrl="cue" aria-label="Cue"></button><span class="r9-cap r42-dim">&nbsp;</span></div>
+          <div class="r42-bk"><span class="r42-t">Load</span><i class="led r9-led" style="visibility:hidden"></i><button class="r9-btn" data-ctrl="load" aria-label="Load"></button><span class="r9-cap r42-dim">&nbsp;</span></div>
+          <div class="r42-bk"><span class="r42-t">Grab</span><i class="led r9-led" data-led="grab"></i><button class="r9-btn" data-ctrl="grab" aria-label="Grab"></button><span class="r9-cap r42-dim">Studio</span></div>
+        </div>
+
+        <div class="r45-row2">
+          <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="33"></i>33</span><span class="r42-lr"><i class="led r9-led" data-led="45"></i>45</span></div>
+            <button class="r9-btn" data-ctrl="speed" aria-label="33 / 45"></button><span class="r9-cap">Speed</span></div>
+          <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="hand"></i>Hand</span><span class="r42-lr"><i class="led r9-led" data-led="speed"></i>Spd</span></div>
+            <button class="r9-btn" data-ctrl="wheel-mode" data-pos="hand" aria-label="Wheel mode: Hand / Speed"></button><span class="r9-cap">Wheel</span></div>
+          <div class="r45-knob"><div class="knob r9-knob-s" data-ctrl="torque" role="slider" tabindex="0" aria-label="Torque" style="--a:-20deg"><i></i></div><span class="r9-cap">Torque</span></div>
+          <div class="r45-knob"><div class="knob r9-knob-s" data-ctrl="volume" role="slider" tabindex="0" aria-label="Volume" style="--a:50deg"><i></i></div><span class="r9-cap">Volume</span></div>
+        </div>
+
+        <!-- disco do scratch: fonte, kit, gesto, modo do fader e Slip (novos, aprovados por Igor em 08/11/2026) -->
+        <div class="r42-group r45-disc"><span class="r42-gt">Scratch Disc</span>
+          <div class="r45-dgrid">
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="src-mus"></i>Mus</span><span class="r42-lr"><i class="led r9-led" data-led="src-smp"></i>Smp</span></div><button class="r9-btn" data-ctrl="src" aria-label="Fonte do scratch: música ou sample"></button><span class="r9-cap">Source</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="kit-1"></i>01</span><span class="r42-lr"><i class="led r9-led" data-led="kit-2"></i>02</span></div><button class="r9-btn" data-ctrl="kit" aria-label="Kit de samples"></button><span class="r9-cap">Kit</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="mix"></i>Mix</span><span class="r42-lr"><i class="led r9-led" data-led="cut"></i>Cut</span></div><button class="r9-btn" data-ctrl="fader-mode" aria-label="Fader: mix ou cut"></button><span class="r9-cap">Mode</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr r42-dim">&nbsp;</span></div><button class="r9-btn" data-ctrl="gest-prev" aria-label="Gesto anterior"></button><span class="r9-cap">Gest &minus;</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr r42-dim">&nbsp;</span></div><button class="r9-btn" data-ctrl="gest-next" aria-label="Próximo gesto"></button><span class="r9-cap">Gest +</span></div>
+            <div class="r45-dual"><div class="r45-leds"><span class="r42-lr"><i class="led r9-led on" data-led="slip"></i>Slip</span></div><button class="r9-btn" data-ctrl="slip" aria-label="Slip"></button><span class="r9-cap">Slip</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- conectores, chaves e fader de scratch -->
+    <div class="r45-bottom">
+      <div class="kc"><i class="r9-jack"></i><span class="r9-cap">Phones</span></div>
+      <div class="kc"><i class="r9-jack"></i><span class="r9-cap">Line Out</span></div>
+      <div class="r42-group r45-xfgrp"><span class="r42-gt">Scratch Fader</span>
+        <button class="sw" data-ctrl="xf-curve" data-pos="sharp" data-n="3" data-opts="sharp,medium,smooth" aria-label="Curva do fader"><span class="slot"><span class="thumb"></span></span><span class="pos"><span>Sharp</span><span>Med</span><span>Smooth</span></span></button>
+        <div class="r45-xf"><div class="xf" data-ctrl="xfader" role="slider" tabindex="0" aria-label="Fader de scratch" style="--pos:.5"><span class="ticks"></span><span class="cap-x"></span></div><span class="r9-cap">Fader</span></div>
+        <button class="sw" data-ctrl="hamster" data-pos="off" data-n="2" data-opts="off,on" aria-label="Hamster"><span class="slot"><span class="thumb"></span></span><span class="pos"><span>Off</span><span>Ham</span></span></button>
+      </div>
+    </div>
+  </section>
+    </div>
+
+    <p class="solo-help">Arraste o disco para fazer scratch e o fader para cortar o som. Com o Arturia Minilab3: o <b>pitch wheel</b> é a mão no disco (modo Hand) ou a velocidade (modo Speed); o <b>fader 1</b> (CC 14) é o fader de scratch; o <b>encoder</b> gira o disco devagar (jog) e, rápido, dá um empurrão ou um backspin. Solte um arquivo de áudio no disco, ou aperte Load, para trocar o som. Teclado: <kbd>Espaço</kbd> liga o motor, <kbd>C</kbd> volta ao começo. MIDI Learn: aperte o botão, toque num controle, mexa no controlador e aperte Enter.</p>
+    <p class="credit">
+      RJ-45 <span id="version">v0.1</span> &middot; open source (GPL-3.0) &middot; scratch da DCX Audio &middot;
+      <span class="r45-lat" id="lat">latência da saída: ligue para medir</span> &middot;
+      <a href="docs/manual.md" target="_blank" rel="noopener">manual</a>
+    </p>
+  </main>
+
+  <input type="file" id="r45-file" accept="audio/*,.wav,.aif,.aiff,.mp3,.ogg,.flac,.m4a" hidden>
+
+  <!-- dcx-core (submódulo vendor/dcx-core, v1.1.0) -->
+  <script src="vendor/dcx-core/js/dsp.js"></script>
+  <script src="vendor/dcx-core/js/decode.js"></script>
+  <script src="vendor/dcx-core/js/store.js"></script>
+  <script src="vendor/dcx-core/js/output.js"></script>
+  <script src="vendor/dcx-core/js/midi.js"></script>
+  <script src="vendor/dcx-core/js/midimap.js"></script>
+  <script src="vendor/dcx-core/js/host.js"></script>
+  <script src="vendor/dcx-core/js/learnbar.js"></script>
+  <!-- o aparelho (turntable.js e worklet.js carregam no AudioWorklet; aqui só o som de demonstração) -->
+  <script src="js/demo-sound.js"></script>
+  <script src="js/rj45.js"></script>
+  <script src="js/solo.js"></script>
+</body>
+</html>
