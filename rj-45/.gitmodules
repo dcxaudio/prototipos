@@ -1,3 +1,0 @@
-[submodule "vendor/dcx-core"]
-	path = vendor/dcx-core
-	url = https://github.com/dcxaudio/dcx-core.git

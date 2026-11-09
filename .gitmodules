@@ -1,0 +1,3 @@
+[submodule "rj-45/vendor/dcx-core"]
+	path = rj-45/vendor/dcx-core
+	url = https://github.com/dcxaudio/dcx-core.git
